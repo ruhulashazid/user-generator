@@ -1,8 +1,9 @@
 import React from "react";
-import { createRandomUsers, Region, User } from "./helper";
+import { Region, User } from "./types";
+import { createRandomUsers } from "./helper";
 
 function App() {
-  const pageRef = React.useRef(0);
+  const pageRef = React.useRef(1);
   const tableRef = React.useRef<HTMLTableElement>(null!);
 
   const [seed, setSeed] = React.useState<number>(
@@ -10,9 +11,10 @@ function App() {
   );
   const [region, setRegion] = React.useState<Region>("en");
   const [errorCount, setErrorCount] = React.useState<number>(0);
-  const [errorCountField, setErrorCountField] = React.useState<number>(0);
   const [users, setUsers] = React.useState<User[]>(() =>
-    createRandomUsers(20, region, seed, pageRef.current, errorCount)
+    createRandomUsers(10, region, seed, pageRef.current, errorCount).concat(
+      createRandomUsers(10, region, seed, ++pageRef.current, errorCount)
+    )
   );
 
   React.useEffect(() => {
@@ -40,7 +42,13 @@ function App() {
   }, [errorCount, region, seed]);
 
   React.useEffect(() => {
-    setUsers(createRandomUsers(20, region, seed, pageRef.current, errorCount));
+    pageRef.current = 1;
+
+    setUsers(
+      createRandomUsers(10, region, seed, pageRef.current, errorCount).concat(
+        createRandomUsers(10, region, seed, ++pageRef.current, errorCount)
+      )
+    );
   }, [seed, region, errorCount]);
 
   return (
@@ -92,25 +100,29 @@ function App() {
           <input
             min={0}
             max={10}
-            step={0.5}
+            step={0.1}
             type={"range"}
-            value={errorCount}
+            value={Math.min(errorCount, 10)}
             onChange={(e) => {
+              if (e.target.value === "") {
+                return;
+              }
+
               const newErrorCount = e.target.valueAsNumber;
               setErrorCount(newErrorCount);
-              setErrorCountField(newErrorCount * 100);
             }}
           />
 
           <input
             type="number"
-            value={errorCountField}
+            value={errorCount}
             onChange={(e) => {
-              const newErrorCountField = e.target.valueAsNumber;
+              if (e.target.value === "") {
+                return;
+              }
 
-              setErrorCountField(newErrorCountField);
-
-              setErrorCount(newErrorCountField / 100);
+              const newErrorCount = e.target.valueAsNumber;
+              setErrorCount(newErrorCount);
             }}
             className="border border-1 border-black p-1.5 rounded-sm "
           />

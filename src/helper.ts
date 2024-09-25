@@ -1,19 +1,7 @@
+import cacher from "./cacher";
+import { User, Region } from "./types";
 import { base, pl, fr, en } from "@faker-js/faker";
 import { Faker, faker, fakerFR, fakerPL } from "@faker-js/faker";
-
-export interface User {
-  id: string;
-  firstName: string;
-  middleName: string;
-  lastName: string;
-  country: string;
-  city: string;
-  street: string;
-  house: string;
-  phone: string;
-}
-
-export type Region = "en" | "fr" | "pl" | "random";
 
 export const randomLocaleGenerator = new Faker({
   locale: [pl, fr, en, base],
@@ -101,51 +89,61 @@ export function createRandomUsers(
   page: number,
   errorCount: number
 ): User[] {
-  const MAX_ERROR_COUNT = 10;
+  const MAX_ERROR_COUNT = 1000;
   if (errorCount > MAX_ERROR_COUNT || errorCount < 0) {
     throw Error(
       `Invalid error count. it should be between 0-${MAX_ERROR_COUNT}. give value: ${errorCount}`
     );
   }
 
-  const generator =
-    region === "en"
-      ? faker
-      : region === "fr"
-        ? fakerFR
-        : region === "pl"
+  return cacher.get(
+    {
+      count,
+      region,
+      seed,
+      page,
+      errorCount,
+    },
+    () => {
+      const generator =
+        region === "en"
+          ? faker
+          : region === "fr"
+          ? fakerFR
+          : region === "pl"
           ? fakerPL
           : randomLocaleGenerator;
 
-  // Seed the faker
-  generator.seed(seed + page);
+      // Seed the faker
+      generator.seed(seed + page);
 
-  const users = Array.from({ length: count }, () =>
-    createRandomUser(generator)
+      const users = Array.from({ length: count }, () =>
+        createRandomUser(generator)
+      );
+
+      const wholeErrorcount = Math.floor(errorCount);
+      const errorProb = errorCount % 1;
+
+      const usersToContainErrors = users
+        .map((eachU, index) => [eachU, index] as const)
+        .filter(() => errorProb === 0 || generator.number.float() < errorProb);
+
+      const usersWithErrors = usersToContainErrors.map(
+        (tuple) =>
+          [
+            makeUserContainErrors(tuple[0], generator, wholeErrorcount),
+            tuple[1],
+          ] as const
+      );
+
+      for (const userWithErrorAndOriginalIndexTuple of usersWithErrors) {
+        const [userWithError, originalIndex] =
+          userWithErrorAndOriginalIndexTuple;
+
+        users[originalIndex] = userWithError;
+      }
+
+      return users;
+    }
   );
-
-  const wholeErrorcount = Math.floor(errorCount)
-  const errorProb = errorCount % 1
-
-
-
-  const usersToContainErrors = users
-    .map((eachU, index) => [eachU, index] as const)
-    .filter(() => (errorProb === 0) || (errorProb > 0 && generator.number.float() < errorProb));
-
-  const usersWithErrors = usersToContainErrors.map(
-    (tuple) =>
-      [
-        makeUserContainErrors(tuple[0], generator, wholeErrorcount),
-        tuple[1],
-      ] as const
-  );
-
-  for (const userWithErrorAndOriginalIndexTuple of usersWithErrors) {
-    const [userWithError, originalIndex] = userWithErrorAndOriginalIndexTuple;
-
-    users[originalIndex] = userWithError;
-  }
-
-  return users;
 }
